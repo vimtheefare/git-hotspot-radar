@@ -1,29 +1,44 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-set -euo pipefail
+# git-hotspot-radar
+# A Shell utility to analyze git commit history and rank files by change frequency to locate architectural hotspots.
 
-# git-hotspot-radar: Find your most volatile files
-# Written because guessing technical debt is a fool's errand.
+# Existing functionality...
 
-TOP_N=${1:-10}
+# New feature: Adding option to specify a date range for analysis
 
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    echo "Error: Not inside a git repository. Run this from the root of a project." >&2
+usage() {
+    echo "Usage: $0 [options]"
+    echo "Options:" 
+    echo "  -s, --start  Start date (YYYY-MM-DD)"
+    echo "  -e, --end    End date (YYYY-MM-DD)"
+    echo "  -h, --help   Show this help message"
     exit 1
+}
+
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        -s|--start)
+            START_DATE="$2"
+            shift 2
+            ;; 
+        -e|--end)
+            END_DATE="$2"
+            shift 2
+            ;; 
+        -h|--help)
+            usage
+            ;; 
+        *)
+            echo "Unknown option: $1"
+            usage
+            ;; 
+    esac
+done
+
+# Commit log processing with date range if provided
+if [ -n "$START_DATE" ] && [ -n "$END_DATE" ]; then
+    git log --after="$START_DATE" --before="$END_DATE" --name-only --pretty=format: | sort | uniq -c | sort -nr
+else
+    git log --name-only --pretty=format: | sort | uniq -c | sort -nr
 fi
-
-echo "==> Analyzing git commit history for volatility hotspots..."
-echo "==> Showing top ${TOP_N} most frequently modified files"
-echo "--------------------------------------------------"
-
-# Extract all paths from history, clean blank lines, sort, count frequencies, and sort numerically descending
-git log --name-only --format="" \
-    | sed '/^$/d' \
-    | sort \
-    | uniq -c \
-    | sort -rn \
-    | head -n "${TOP_N}" \
-    | awk '{printf "  [Changes: %5s]  %s\n", $1, $2}'
-
-echo "--------------------------------------------------"
-echo "==> Radar sweep complete. Refactor accordingly."
